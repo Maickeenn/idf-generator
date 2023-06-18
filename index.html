@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css">
+  <title>Alteração de arquivos IDF em lote</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding: 0;
+    }
+
+    h1 {
+      text-align: center;
+    }
+
+    form {
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    label {
+      display: block;
+      margin-top: 10px;
+    }
+
+    input[type="file"],
+    input[type="text"] {
+      width: 100%;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 3px;
+    }
+
+    input[type="file"]:disabled {
+      background-color: #f1f1f1;
+    }
+
+    .error {
+      border: 2px solid red;
+    }
+
+    .error-message {
+      color: red;
+      margin-top: 5px;
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 20px;
+      padding: 10px;
+      background-color: #4CAF50;
+      color: #fff;
+      font-size: 16px;
+      border: none;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    button:disabled {
+      background-color: #ccc;
+      cursor: not-allowed;
+    }
+
+    pre {
+      font-family: monospace;
+      background-color: #f7f7f7;
+      padding: 10px;
+      white-space: pre-wrap;
+    }
+
+    .popup-content {
+      margin-top: 20px;
+    }
+
+    /* Estilo para o ícone de informação */
+    .fas.fa-info-circle {
+      margin-left: 5px;
+      color: #aaa;
+      cursor: help;
+    }
+
+    /* Estilo para o tooltip */
+    .fas.fa-info-circle::before {
+      content: attr(data-tooltip);
+      position: absolute;
+      top: -30px;
+      left: 0;
+      width: 200px;
+      padding: 5px;
+      background-color: #333;
+      color: #fff;
+      font-size: 12px;
+      border-radius: 4px;
+      opacity: 0;
+      transition: opacity 0.3s ease-in-out;
+    }
+
+    .fas.fa-info-circle:hover::before {
+      opacity: 1;
+    }
+  </style>
+  <script>
+    async function gerarArquivos() {
+      const idfFile = document.getElementById('idfFile').value;
+      const materialName = document.getElementById('materialName').value;
+      const solarAbsorptance = document.getElementById('solarAbsorptance').value;
+      const visibleAbsorptance = document.getElementById('visibleAbsorptance').value;
+
+      if (!idfFile) {
+        alert('Por favor, selecione um arquivo .idf.');
+        return;
+      }
+
+      if (!materialName) {
+        alert('Por favor, insira o nome do material.');
+        return;
+      }
+
+      const solarAbsorptanceList = extractNumbers(solarAbsorptance);
+      const visibleAbsorptanceList = extractNumbers(visibleAbsorptance);
+
+      if (solarAbsorptanceList.length !== visibleAbsorptanceList.length) {
+        alert('Os valores de solarAbsorptance e visibleAbsorptance devem ter a mesma quantidade de elementos.');
+        return;
+      }
+
+      const fileInput = document.getElementById('idfFile');
+      const file = fileInput.files[0];
+
+      try {
+        const lines = await readLinesFromFile(file);
+
+        let materialFound = false;
+        let classFound = false;
+
+        let solarAbsorptanceValue = '';
+        let visibleAbsorptanceValue = '';
+
+        const regex = /\b\d+\.\d+\b/g;
+
+        for (let count = 0; count < solarAbsorptanceList.length; count++) {
+          solarAbsorptanceValue = solarAbsorptanceList[count];
+          visibleAbsorptanceValue = visibleAbsorptanceList[count];
+
+          createOutputFile(lines.map(line => {
+            if (line.includes("ALL OBJECTS IN CLASS:")) {
+                classFound = false;
+              if (line.includes("MATERIAL")) { 
+                classFound = true;
+              }
+            } else if (classFound && line.includes("!- Name")) {
+                materialFound = false;
+              if (line.includes(materialName)) { 
+                materialFound = true;
+              }
+            } else if (classFound && materialFound && line.includes('!- Solar Absorptance')) {
+              line = line.replace(regex, solarAbsorptanceValue);
+            } else if (classFound && materialFound && line.includes('!- Visible Absorptance')) {
+              line = line.replace(regex, visibleAbsorptanceValue);
+            }
+            return line;
+          }));
+        }
+      } catch (error) {
+        console.error(error);
+        alert('Erro ao processar o arquivo.');
+      }
+    }
+
+    function readLinesFromFile(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const fileContent = e.target.result;
+          const lines = fileContent.split(/\r?\n/);
+          resolve(lines);
+        };
+        reader.onerror = function(e) {
+          reject(e.target.error);
+        };
+        reader.readAsText(file);
+      });
+    }
+
+    function createOutputFile(lines) {
+      const outputContent = lines.join('\n');
+      const timestamp = new Date().toISOString().replace(/[-:.T]/g, "").slice(0, 17);
+      const filename = 'output-' + timestamp + '.idf';
+      const blob = new Blob([outputContent], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function extractNumbers(string) {
+      const regex = /[-]{0,1}[\d]*[\.]{0,1}[\d]+/g;
+      const numbersFound = string.match(regex);
+      const numbers = numbersFound.map(number => parseFloat(number));
+      return numbers;
+    }
+  </script>
+</head>
+<body>
+  <h1>Ferramenta de geração de arquivos .IDF</h1>
+
+  <form>
+    <label for="idfFile">Arquivo:</label>
+    <input type="file" id="idfFile" accept=".idf" aria-label="Selecione um arquivo IDF" required>
+
+    <label for="materialName">Nome do material:</label>
+    <input type="text" id="materialName" placeholder="Digite o nome do material" required>
+
+    <label for="solarAbsorptance">Solar Absorptance (separado por vírgula):
+    <i class="fa fa-info-circle" data-toggle="tooltip" title="Valor de absorção solar. Exemplo: 0.7, 0.8, 0.9"></i>
+    </label>
+    <input type="text" id="solarAbsorptance" placeholder="Digite os valores de Solar Absorptance" required>
+
+    <label for="visibleAbsorptance">Visible Absorptance (separado por vírgula):
+    <i class="fa fa-info-circle" data-toggle="tooltip" title="Valor de absorção visível. Exemplo: 0.5, 0.6, 0.7"></i>
+    </label>
+    <input type="text" id="visibleAbsorptance" placeholder="Digite os valores de Visible Absorptance" required>
+
+    <button type="button" onclick="gerarArquivos()">Gerar Arquivos</button>
+  </form>
+
+  <script>
+    function handleFileSelection() {
+      const fileField = document.getElementById('idfFile');
+      const fileNameField = document.getElementById('idfFileName');
+
+      fileNameField.value = fileField.files[0].name;
+
+      if (fileField.value) {
+        fileNameField.classList.remove('error');
+      } else {
+        fileNameField.classList.add('error');
+      }
+    }
+  </script>
+  <footer>
+    <p>© 2023 Gabriel Amaro. Todos os direitos reservados.</p>
+  </footer>
+</body>
+</html>

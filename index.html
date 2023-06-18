@@ -122,6 +122,16 @@
         return;
       }
 
+      if (!solarAbsorptance) {
+        alert('Por favor, insira os novos valores de Solar Absorptance.');
+        return;
+      }
+
+      if (!visibleAbsorptance) {
+        alert('Por favor, insira os novos valores de Visible Absorptance.');
+        return;
+      }
+
       const solarAbsorptanceList = extractNumbers(solarAbsorptance);
       const visibleAbsorptanceList = extractNumbers(visibleAbsorptance);
 

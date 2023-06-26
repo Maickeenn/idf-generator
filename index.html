@@ -111,9 +111,13 @@
       const materialName = document.getElementById('materialName').value;
       const solarAbsorptance = document.getElementById('solarAbsorptance').value;
       const visibleAbsorptance = document.getElementById('visibleAbsorptance').value;
+      const regexInputFileName = /[A-Za-z]+-[A-Za-z]+-\d+-[A-Za-z]+\d{2}\.idf/;
 
       if (!idfFile) {
         alert('Por favor, selecione um arquivo .idf.');
+        return;
+      } else if (!regexInputFileName.test(document.getElementById('idfFile').files[0].name)) {
+        alert('Por favor, insira um arquivo com a nomenclatura no padrão XXX-YYY-00-R00.idf.');
         return;
       }
 
@@ -153,10 +157,14 @@
         let visibleAbsorptanceValue = '';
 
         const regex = /\b\d+\.\d+\b/g;
+        const regexFileName = /-(\d+)-/;
 
         for (let count = 0; count < solarAbsorptanceList.length; count++) {
           solarAbsorptanceValue = solarAbsorptanceList[count];
           visibleAbsorptanceValue = visibleAbsorptanceList[count];
+
+          
+          const fileName = file.name.replace(regexFileName, `-${solarAbsorptanceValue}-`);
 
           createOutputFile(lines.map(line => {
             if (line.includes("ALL OBJECTS IN CLASS:")) {
@@ -175,7 +183,7 @@
               line = line.replace(regex, visibleAbsorptanceValue);
             }
             return line;
-          }));
+          }), fileName);
         }
       } catch (error) {
         console.error(error);
@@ -198,15 +206,13 @@
       });
     }
 
-    function createOutputFile(lines) {
+    function createOutputFile(lines, fileName) {
       const outputContent = lines.join('\n');
-      const timestamp = new Date().toISOString().replace(/[-:.T]/g, "").slice(0, 17);
-      const filename = 'output-' + timestamp + '.idf';
       const blob = new Blob([outputContent], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = filename;
+      link.download = fileName;
       link.click();
       URL.revokeObjectURL(url);
     }
